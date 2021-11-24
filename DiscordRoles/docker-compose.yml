@@ -1,0 +1,12 @@
+version: '3.4'
+
+services:
+  discordroles:
+    image: ${DOCKER_REGISTRY-}discordroles
+    build:
+      context: .
+      dockerfile: DiscordRoles/Dockerfile
+    environment:
+      # Add your discord token and server id below. 
+      DISCORD_TOKEN: 
+      DISCORD_GUILD:
