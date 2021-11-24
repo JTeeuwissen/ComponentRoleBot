@@ -143,9 +143,9 @@ public class Program
                 {
                     bool added = _dict.TryAdd(arg.User.Id, new Dictionary<string, List<SocketRole>>());
                     if (added)
-                        await arg.RespondAsync("Created.");
+                        await arg.RespondAsync("Created.", ephemeral: true);
                     else
-                        await arg.RespondAsync("Already exists.");
+                        await arg.RespondAsync("Already exists.", ephemeral: true);
 
                     break;
                 }
@@ -153,9 +153,9 @@ public class Program
                 {
                     bool removed = _dict.TryRemove(arg.User.Id, out _);
                     if (removed)
-                        await arg.RespondAsync("Deleted");
+                        await arg.RespondAsync("Deleted", ephemeral: true);
                     else
-                        await arg.RespondAsync("Does not exist.");
+                        await arg.RespondAsync("Does not exist.", ephemeral: true);
                     break;
                 }
                 case "add":
@@ -163,13 +163,13 @@ public class Program
                     bool got = _dict.TryGetValue(arg.User.Id, out Dictionary<string, List<SocketRole>>? value);
                     if (!got)
                     {
-                        await arg.RespondAsync("Does not exist.");
+                        await arg.RespondAsync("Does not exist.", ephemeral: true);
                         break;
                     }
 
                     if (value!.Count >= 4)
                     {
-                        await arg.RespondAsync("Already max length.");
+                        await arg.RespondAsync("Already max length.", ephemeral: true);
                         break;
                     }
 
@@ -183,7 +183,7 @@ public class Program
                             .ToList()
                     );
 
-                    await arg.RespondAsync("Added.");
+                    await arg.RespondAsync("Added.", ephemeral: true);
                     break;
                 }
                 case "finish":
@@ -212,12 +212,14 @@ public class Program
                         .WithButton("remove all", "remove", ButtonStyle.Danger)
                         .Build();
 
+                    await arg.DeferAsync(true);
                     await arg.Channel.SendMessageAsync("Select Roles(s)", component: component);
-                    await arg.RespondAsync("Finished.");
+                    await arg.FollowupAsync("Finished.", ephemeral: true);
                     break;
                 }
                 default:
                     await arg.RespondAsync(
+                        ephemeral: true,
                         embed: new EmbedBuilder().WithTitle("Unknown Command")
                             .WithCurrentTimestamp()
                             .Build()
@@ -254,12 +256,12 @@ public class Program
             List<ulong> unselectedValues = allValues.Except(selectedValues)
                 .ToList();
 
-            await Task.WhenAll(
-                unselectedValues.Count == 0 ? Task.CompletedTask : user.RemoveRolesAsync(unselectedValues),
-                selectedValues.Count == 0 ? Task.CompletedTask : user.AddRolesAsync(selectedValues)
-            );
+            await arg.DeferAsync(true);
 
-            await arg.RespondAsync(
+            if (unselectedValues.Count != 0) await user.RemoveRolesAsync(unselectedValues);
+            if (selectedValues.Count != 0) await user.AddRolesAsync(selectedValues);
+
+            await arg.FollowupAsync(
                 embed: new EmbedBuilder().WithTitle("Updated roles")
                     .WithDescription($"For {arg.Data.CustomId}")
                     .Build(),
@@ -304,8 +306,9 @@ public class Program
                     );
                     break;
                 case "remove":
+                    await arg.DeferAsync(true);
                     if (allValues.Count != 0) await user.RemoveRolesAsync(allValues);
-                    await arg.RespondAsync(
+                    await arg.FollowupAsync(
                         embed: new EmbedBuilder().WithTitle("Removed all roles")
                             .Build(),
                         ephemeral: true
