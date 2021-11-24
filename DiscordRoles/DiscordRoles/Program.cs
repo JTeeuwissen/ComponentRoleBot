@@ -104,6 +104,7 @@ public class Program
                 .AddOption(
                     new SlashCommandOptionBuilder().WithName("finish")
                         .WithDescription("Finish a role component")
+                        .AddOption("message", ApplicationCommandOptionType.String, "The id of the message to replace.")
                         .WithType(ApplicationCommandOptionType.SubCommand)
                 )
                 .Build();
@@ -213,7 +214,20 @@ public class Program
                         .Build();
 
                     await arg.DeferAsync(true);
-                    await arg.Channel.SendMessageAsync("Select Roles(s)", component: component);
+
+                    // If a message id was supplied, replace that message. Otherwise create a new message.
+                    string? messageIdMaybe = arg.Data.Options.Single()
+                        .Options.Select(option => option.Value)
+                        .OfType<string>()
+                        .SingleOrDefault();
+                    if (messageIdMaybe is { } messageId)
+                        await arg.Channel.ModifyMessageAsync(
+                            ulong.Parse(messageId),
+                            properties => properties.Components = component
+                        );
+                    else
+
+                        await arg.Channel.SendMessageAsync("Select Roles(s)", component: component);
                     await arg.FollowupAsync("Finished.", ephemeral: true);
                     break;
                 }
