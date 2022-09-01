@@ -5,13 +5,14 @@ using Discord.Net;
 using Discord.WebSocket;
 
 // Env vars.
-string token = Environment.GetEnvironmentVariable("DISCORD_TOKEN") ?? throw new Exception($"environment variable DISCORD_TOKEN not found");
+string token = Environment.GetEnvironmentVariable("DISCORD_TOKEN") ??
+               throw new Exception($"environment variable DISCORD_TOKEN not found");
 
 // Discord client.
-DiscordSocketClient client = new();
+DiscordSocketClient client = new ();
 
 // A dict containing the current component a user is working on.
-ConcurrentDictionary< (ulong, ulong), Dictionary<string, List<SocketRole>>> dict = new();
+ConcurrentDictionary<(ulong, ulong), Dictionary<string, List<SocketRole>>> dict = new ();
 
 client.Log += Log;
 client.Ready += Ready;
@@ -82,9 +83,8 @@ async Task SlashCommandExecuted(SocketSlashCommand arg)
     try
     {
         (ulong, ulong) key = ((arg.Channel as IGuildChannel ?? throw new InvalidOperationException()).GuildId, arg.User.Id);
-        
-        switch (arg.Data.Options.First()
-                    .Name)
+
+        switch (arg.Data.Options.First().Name)
         {
             case "create":
             {
@@ -120,22 +120,31 @@ async Task SlashCommandExecuted(SocketSlashCommand arg)
                     break;
                 }
 
-                List<object> optionValues = arg.Data.Options.Single()
-                    .Options.Select(option => option.Value)
-                    .ToList();
-                
-                bool added = value.TryAdd(
-                    optionValues.OfType<string>()
-                        .Single(),
-                    optionValues.OfType<SocketRole>()
-                        .ToList()
-                );
+                List<SocketSlashCommandDataOption> options = arg.Data.Options.Single().Options.ToList();
 
-                if (!added)
+                string name = (string)options.Single(option => option.Name == "name");
+
+                if (value.ContainsKey(name))
                 {
-                    await arg.RespondAsync("Key already exists.", ephemeral: true);
+                    await arg.RespondAsync($"Name already exists: {name}", ephemeral: true);
                     break;
                 }
+
+                List<SocketRole> roles = options.Select(option => option.Value).OfType<SocketRole>().ToList();
+
+                List<IGrouping<string, SocketRole>> duplicates =
+                    roles.GroupBy(role => role.Name).Where(group => group.Count() > 1).ToList();
+
+                if (duplicates.Any())
+                {
+                    await arg.RespondAsync(
+                        $"Can't have duplicate values: {string.Join(' ', duplicates.Select(duplicate => duplicate.Key))}",
+                        ephemeral: true
+                    );
+                    break;
+                }
+
+                value.Add(name, roles);
 
                 await arg.RespondAsync("Added.", ephemeral: true);
                 break;
@@ -180,7 +189,7 @@ async Task SlashCommandExecuted(SocketSlashCommand arg)
                     );
                 else
                     await arg.Channel.SendMessageAsync("Select Roles(s)", components: component);
-                
+
                 await arg.FollowupAsync("Finished.", ephemeral: true);
                 break;
             }
@@ -201,7 +210,7 @@ async Task SlashCommandExecuted(SocketSlashCommand arg)
     }
 }
 
-async static Task SelectMenuExecuted(SocketMessageComponent arg)
+static async Task SelectMenuExecuted(SocketMessageComponent arg)
 {
     try
     {
@@ -236,7 +245,7 @@ async static Task SelectMenuExecuted(SocketMessageComponent arg)
     }
 }
 
-async static Task ButtonExecuted(SocketMessageComponent arg)
+static async Task ButtonExecuted(SocketMessageComponent arg)
 {
     try
     {
