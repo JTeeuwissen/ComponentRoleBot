@@ -6,10 +6,16 @@ using Discord.WebSocket;
 
 // Env vars.
 string token = Environment.GetEnvironmentVariable("DISCORD_TOKEN") ??
-               throw new Exception($"environment variable DISCORD_TOKEN not found");
+               throw new Exception("environment variable DISCORD_TOKEN not found");
 
 // Discord client.
-DiscordSocketClient client = new ();
+DiscordSocketClient client = new (
+    new DiscordSocketConfig
+    {
+        // Intent for receiving slash commands and component interactions.
+        GatewayIntents = GatewayIntents.Guilds
+    }
+);
 
 // A dict containing the current component a user is working on.
 ConcurrentDictionary<(ulong, ulong), Dictionary<string, List<SocketRole>>> dict = new ();
