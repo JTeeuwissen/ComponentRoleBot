@@ -4,6 +4,10 @@ using Discord;
 using Discord.Net;
 using Discord.WebSocket;
 
+const string messageName = "message";
+const string listAllOptionName = "list";
+const string removeAllOptionName = "remove";
+
 // Env vars.
 string token = Environment.GetEnvironmentVariable("DISCORD_TOKEN") ??
                throw new Exception("environment variable DISCORD_TOKEN not found");
@@ -71,7 +75,17 @@ async Task Ready()
             .AddOption(
                 new SlashCommandOptionBuilder().WithName("finish")
                     .WithDescription("Finish a role component")
-                    .AddOption("message", ApplicationCommandOptionType.String, "The id of the message to replace.")
+                    .AddOption(messageName, ApplicationCommandOptionType.String, "The id of the message to replace.")
+                    .AddOption(
+                        listAllOptionName,
+                        ApplicationCommandOptionType.Boolean,
+                        "Show a list all button below the select menus. Defaults to true."
+                    )
+                    .AddOption(
+                        removeAllOptionName,
+                        ApplicationCommandOptionType.Boolean,
+                        "Show a remove all button below the select menus. Defaults to true."
+                    )
                     .WithType(ApplicationCommandOptionType.SubCommand)
             )
             .Build();
@@ -120,7 +134,7 @@ async Task SlashCommandExecuted(SocketSlashCommand arg)
                     break;
                 }
 
-                if (value!.Count >= 4)
+                if (value!.Count >= 5)
                 {
                     await arg.RespondAsync("Already max length.", ephemeral: true);
                     break;
@@ -152,7 +166,7 @@ async Task SlashCommandExecuted(SocketSlashCommand arg)
 
                 value.Add(name, roles);
 
-                await arg.RespondAsync("Added.", ephemeral: true);
+                await arg.RespondAsync($"Added. {(value.Count == 5 ? "List and remove buttons no longer available." : "")}", ephemeral: true);
                 break;
             }
             case "finish":
@@ -164,30 +178,41 @@ async Task SlashCommandExecuted(SocketSlashCommand arg)
                     break;
                 }
 
-                MessageComponent component = value!.Aggregate(
-                        new ComponentBuilder(),
-                        (component, kvp) => component.WithSelectMenu(
-                            kvp.Value.Aggregate(
-                                    new SelectMenuBuilder(),
-                                    (select, role) => select.AddOption(role.Name, role.Id.ToString())
-                                )
-                                .WithPlaceholder($"Select {kvp.Key}(s)")
-                                .WithCustomId(kvp.Key)
-                                .WithMinValues(0)
-                                .WithMaxValues(kvp.Value.Count)
-                        )
-                    )
-                    .WithButton("list all", "list")
-                    .WithButton("remove all", "remove", ButtonStyle.Danger)
-                    .Build();
-
                 await arg.DeferAsync(true);
 
+                List<SocketSlashCommandDataOption> options = arg.Data.Options.Single().Options.ToList();
+
+                ComponentBuilder componentBuilder = value!.Aggregate(
+                    new ComponentBuilder(),
+                    (component, kvp) => component.WithSelectMenu(
+                        kvp.Value.Aggregate(
+                                new SelectMenuBuilder(),
+                                (select, role) => select.AddOption(role.Name, role.Id.ToString())
+                            )
+                            .WithPlaceholder($"Select {kvp.Key}(s)")
+                            .WithCustomId(kvp.Key)
+                            .WithMinValues(0)
+                            .WithMaxValues(kvp.Value.Count)
+                    )
+                );
+
+                // Buttons only fit if 4 or less select menus are used.
+                if (value!.Count <= 4)
+                {
+                    if (options.SingleOrDefault(option => option.Name == listAllOptionName)?.Value is null or true)
+                        componentBuilder = componentBuilder.WithButton("list all", "list");
+
+
+                    if (options.SingleOrDefault(option => option.Name == removeAllOptionName)?.Value is null or true)
+                        componentBuilder = componentBuilder.WithButton("remove all", "remove", ButtonStyle.Danger);
+                }
+
+                MessageComponent? component = componentBuilder.Build();
+
+
                 // If a message id was supplied, replace that message. Otherwise create a new message.
-                string? messageIdMaybe = arg.Data.Options.Single()
-                    .Options.Select(option => option.Value)
-                    .OfType<string>()
-                    .SingleOrDefault();
+                string? messageIdMaybe = options.SingleOrDefault(option => option.Name == messageName)?.Value as string;
+
                 if (messageIdMaybe is { } messageId)
                     await arg.Channel.ModifyMessageAsync(
                         ulong.Parse(messageId),
